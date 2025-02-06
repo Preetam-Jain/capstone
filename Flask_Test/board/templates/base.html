@@ -1,12 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <title>Message Board - {% block title %}{% endblock title %}</title>
+  <title> App Name - {% block title %}{% endblock title %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
-<body>
-<h1>Message Board</h1>
-{% include("_navigation.html") %}
+<body class="main-page">
+
+<div class="left-page">
+  <h1>Name</h1>
+  {% include("_navigation.html") %}
+</div>
+
+<div class="right-page">
+  <div class="overview-section">
+    <h2>Overview</h2>
+    <h3> some info here...</h3>
+  </div>
+  <div class="graph-section">
+
+  </div>
+
 <section>
   <header>
     {% block header %}{% endblock header %}
@@ -15,5 +28,6 @@
     {% block content %}<p>No messages.</p>{% endblock content %}
   </main>
 </section>
+</div>
 </body>
 </html>
