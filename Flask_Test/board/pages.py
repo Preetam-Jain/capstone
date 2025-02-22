@@ -13,6 +13,10 @@ def home():
 def about():
     return render_template("pages/about.html")
 
+@bp.route("/dashboard")
+def dashboard():
+    return render_template("pages/dashboard.html")
+
 @bp.route('/fetch-data', methods=['GET'])
 def fetch_data():
     url = "https://testapi.io/api/aam08331/Testapi"
