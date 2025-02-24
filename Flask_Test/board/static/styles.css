@@ -1,13 +1,22 @@
 /* Header: Oswald
  * Other text: Merriweather sans
  *
- * 
-*/
+ * Colors are from STEGO page
+ * svg from www.svgrepo.com
+ */
 
 :root {
   --primary-white: #F7F7F7;
-  --primary-red: #BA0C2F;
-  --primary-black: #000000;
+  --primary-red: #d00e6f;
+  --primary-black: #3e3e3e;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+.red-text {
+  color: var(--primary-red);
 }
 
 * {
@@ -21,6 +30,7 @@
     text-align: center;
     display: flex;
     height: 100vh;
+    color: var(--primary-black);
   }
 
   
@@ -39,7 +49,7 @@
   /* navigation bar */
   .left-page {
     width: 20%; 
-    padding: 40px 10px;
+    padding: 20px 10px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -70,6 +80,17 @@
     padding: 20px;
   }
 
+  nav {
+    position: fixed;  
+    top: 0;
+    left: 0;
+    width: 250px; 
+    height: 100vh; 
+    overflow-y: auto; 
+    background: var(--primary-black); 
+    padding: 20px;
+  }
+
   .nav-list {
     display: flex;
     flex-direction: column;
@@ -79,6 +100,18 @@
     font-family: 'Oswald', sans-serif;
     padding: 0;
     margin: 0;
+    color: white;
+
+    
+    
+
+  }
+
+  .nav-list img {
+    width: 80%;
+    display: block;
+    margin: 0 auto;
+    padding: 20px 10px;
   }
 
   .nav-list a {
@@ -148,36 +181,27 @@
 
   /* home.html */
 
-  .home-header {
+  .header {
     font-family: 'Oswald', sans-serif;
-    font-size: 60px;
+    font-size: 50px;
     margin: 0;
     padding: 0;
     padding: 50px 10px 30px 10px;
     display: block;
+    line-height: 80px;
+    text-transform: uppercase;
   }
 
   .home-body {
     font-family: 'Merriweather', sans-serif;
-    line-height: 20px;
+    line-height: 36px;
   }
 
-  .learn-more-button {
-    display: inline-block;       
-    padding: 12px 24px;           
-    color: var(--primary-black);
-    text-decoration: none;       
+  .home-features {
    
-    font-weight: bold;      
-    transition: background-color 0.3s, color 0.3s;
-    margin: 20px;
-    border: 2px var(--primary-black) solid;
-  }
-
-  
-  .learn-more-button:hover {
-    background-color: var(--primary-black);
-    color: white;
+    color: var(--primary-red);
+    text-transform: uppercase;
+    padding: 20px 0;
 
   }
 
@@ -187,6 +211,7 @@
     flex-direction: row; 
     justify-content: space-between; 
     margin: 20px;
+    
   }
 
   /* "a" element */
@@ -194,16 +219,90 @@
   color: var(--primary-black);
   flex: 1; 
   margin: 0 10px; 
-  
-  padding: 20px;
-  text-align: center;
-  text-decoration: none;
+  align-items: center;
+  padding: 10px 20px;
+  display: inline-block;                  
+  color: var(--primary-black);
+  text-decoration: none;       
+   
   transition: background-color 0.3s, color 0.3s;
+  
+  border: 2px var(--primary-black) solid;
+  }
+
+  .home-block-item img {
+    width: 60px;
+  }
+
+  /* when you hover over the button, it'll turn the svg white*/
+  .home-block-item:hover img {
+    filter: brightness(0) invert(1);
+  }
+
+  .home-block-item h3 {
+    font-size: 19px;
+    margin: 0;
+  }
+
+  .home-block-item p {
+    font-size: 15px;
+    
   }
 
   .home-block-item:hover {
-    background-color: #f0f0f0;
+   
     cursor: pointer;
-
+    background-color: var(--primary-black);
+    color: white;
   }
+
+  /* css for about.html */ 
+  .about-container {
+    display: flex;
+    flex-direction: column;
+    max-width: 1000px;
+    margin: auto;
+    padding: 0 20px 50px 20px;
+  }
+  
+  .about-row {
+    display: flex;
+    align-items: flex-start;
+    padding: 20px 0;
+  }
+  
+  .about-header {
+    flex: 1; 
+    font-family: 'Oswald', sans-serif;
+    font-size: 30px;
+    font-weight: bold;
+    color: var(--primary-red);
+    text-transform: uppercase;
+    text-align: left;
+    padding-right: 20px;
+    align-self: center;
+  }
+  
+  .about-content {
+    flex: 2; 
+    font-size: 16px;
+    color: #555;
+    text-align: left;
+    justify-content: flex-start;
+    line-height: 25px;
+  }
+  
+  
+  @media (max-width: 768px) {
+    .about-row {
+      flex-direction: column;
+    }
+  
+    .about-header {
+      padding-bottom: 10px;
+      text-align: center;
+    }
+  }
+  
+  
   

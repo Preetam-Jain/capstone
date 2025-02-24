@@ -1,5 +1,9 @@
 <nav>
     <ul class="nav-list">
+
+      
+      <img src="{{ url_for('static', filename='images/stego-logo.svg') }}" alt="STEGO logo" >
+
       <li class="nav-item">
         <a class="nav-link" href="{{ url_for('pages.home') }}">Home</a>
       </li>
@@ -10,7 +14,7 @@
         <a class="nav-link" href="{{ url_for('pages.dashboard') }}">Dashboard</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('pages.about') }}">...</a>
+        <a class="nav-link" href="{{ url_for('pages.dashboard') }}">Email</a>
       </li>
     </ul>
   </nav>
