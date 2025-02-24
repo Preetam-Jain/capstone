@@ -6,6 +6,8 @@ mail = Mail()
 
 def create_app():
     app = Flask(__name__)
+    
+    app.config['TEMPLATES_AUTO_RELOAD'] = True
 
     app.config['MAIL_SERVER'] = 'smtp.gmail.com'
     app.config['MAIL_PORT'] = 587
@@ -17,3 +19,7 @@ def create_app():
 
     app.register_blueprint(pages.bp)
     return app
+
+if __name__ == '__main__':
+    app = create_app() 
+    app.run(debug=True)

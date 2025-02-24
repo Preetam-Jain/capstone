@@ -2,11 +2,34 @@
 
 
 {% block header %}
-  <h2>{% block title %}Home{% endblock title %}</h2>
+  <h1 class = "home-header">{% block title %}HOME PAGE HEADER{% endblock title %}</h1>
 {% endblock header %}
 
 {% block content %}
-  <p>
-    Learn more about this project by visiting the <a href="{{ url_for('pages.about') }}">About page</a>.
+  <p> maybe image or divider here <p>
+  <p class="home-body">
+    insert text here... insert text here... insert text here... insert text here... insert text here...
+    insert text here... insert text here... insert text here... insert text here... insert text here...
   </p>
+
+  <div>
+    <a class="learn-more-button" href="{{ url_for('pages.about') }}">LEARN MORE</a>
+  </div>
+
+
+
+  <div class="home-3-block">
+    <a class="home-block-item" href="{{ url_for('pages.dashboard') }}">
+      <h3>VIEW DASHBOARD</h3>
+      <p>this will be clickable</p>
+    </a>
+    <div class="home-block-item">
+      <h3>calculations?</h3>
+      <p>(quick blurb about .....)</p>
+    </div>
+    <div class="home-block-item">
+      <h3>register for email thing?</h3>
+      <p>(quick blurb ..........)</p>
+    </div>
+  </div>
 {% endblock content %}

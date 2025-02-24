@@ -68,3 +68,5 @@ def send_email():
         return jsonify({"message": "Email sent successfully!"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+    
