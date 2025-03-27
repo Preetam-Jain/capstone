@@ -26,7 +26,7 @@ service = Service("/usr/local/bin/chromedriver")  # Change this path if necessar
 driver = webdriver.Chrome(service=service, options=chrome_options)
 
 # Open AchtBytes login page
-driver.get("https://iot.achtbytes.com/login")
+driver.get("https://iot.achtbytes.com/copc/tenant")
 time.sleep(15)  # Wait for the page to load
 
 # Log in to AchtBytes
