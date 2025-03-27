@@ -10,7 +10,7 @@ def generate_data():
 import asyncio
 import websockets
 
-async def handle_client(websocket, path):
+async def handle_client(websocket):
     print("Client connected")
     try:
         async for message in websocket:
