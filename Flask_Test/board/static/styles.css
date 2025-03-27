@@ -9,6 +9,7 @@
   --primary-white: #F7F7F7;
   --primary-red: #d00e6f;
   --primary-black: #3e3e3e;
+  --darker-red: #a10b59; /* for hovering over a red button */
 }
 
 html {
@@ -89,6 +90,11 @@ html {
     overflow-y: auto; 
     background: var(--primary-black); 
     padding: 20px;
+
+    display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100vh;
   }
 
   .nav-list {
@@ -101,9 +107,6 @@ html {
     padding: 0;
     margin: 0;
     color: white;
-
-    
-    
 
   }
 
@@ -146,7 +149,13 @@ html {
     text-decoration: none;
   }
   
-
+  .nav-footer {
+    font-size: 18px;
+    text-align: center;
+    padding-bottom: 0;
+    color: #999;
+    font-family: 'Oswald', sans-serif;
+  }
   
 
   
@@ -302,6 +311,121 @@ html {
       padding-bottom: 10px;
       text-align: center;
     }
+  }
+
+  /* For subscribe page */
+  .subscribe-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 40px;
+    margin-top: 30px;
+  }
+  
+  .subscribe-text {
+    flex: 1;
+    min-width: 280px;
+    font-family: 'Merriweather', sans-serif;
+    line-height: 36px;
+    text-align: left;
+  }
+  
+  .subscribe-form-box {
+    flex: 1;
+    min-width: 280px;
+    
+    padding: 24px;
+    border: 2px var(--primary-black) solid;
+    
+  }
+  
+  .subscribe-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .form-group {
+    text-align: left;
+  }
+  
+  .form-label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--primary-black);
+    font-size: 15px;
+    font-family: 'Merriweather', sans-serif;
+  }
+  
+  .form-input {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border: 1px solid --primary-white;
+    
+    box-sizing: border-box;
+    color: var(--primary-black);
+  }
+  
+  .form-input:focus {
+    border-color: var(--primary-red);
+    outline: none;
+  }
+  
+  .subscribe-button {
+    background-color: var(--primary-red);
+    color: var(--primary-white);
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .subscribe-button:hover {
+    background-color: #a10b59;
+  }
+  
+  .form-message {
+    margin-top: 12px;
+    font-size: 14px;
+  }
+  
+  .form-message.success {
+    color: green;
+  }
+  
+  .form-message.error {
+    color: red;
+  }
+
+  /* animation */
+  #header-fade {
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity 1s ease, transform 1s ease;
+  }
+  
+  #header-fade.fade-in {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  
+  #fade-container {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 1.2s ease, transform 1.2s ease;
+  }
+  
+  /* when content has loaded in */
+  #fade-container.fade-in {
+    opacity: 1;
+    transform: translateY(0);
   }
   
   

@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, current_app, render_template
+from flask import Blueprint, jsonify, request, current_app, render_template, redirect, url_for
 import requests
 from flask_mail import Message
 from board.mail import mail
@@ -16,6 +16,32 @@ def about():
 @bp.route("/dashboard")
 def dashboard():
     return render_template("pages/dashboard.html")
+
+@bp.route('/subscribe', methods=['GET', 'POST'])
+def subscribe():
+    if request.method == 'POST':
+        first_name = request.form.get('first_name')
+        last_name = request.form.get('last_name')
+        email = request.form.get('email')
+
+        if not first_name or not last_name or not email:
+            return render_template('pages/subscribe.html', error="All fields are required.")
+
+        # construct confirmation email 
+        subject = "Subscription Confirmed"
+        body = f"Hello {first_name},\n\nThank you for subscribing to the weekly reports from the Capstone - Traffic Monitoring Dashboard!"
+
+        msg = Message(subject=subject, sender="testingcapstonedesign@gmail.com", recipients=[email])
+        msg.body = body
+
+        try:
+            mail.send(msg)
+            return render_template('pages/subscribe.html', success="You've been subscribed successfully!")
+        except Exception as e:
+            return render_template('pages/subscribe.html', error=f"Failed to send email: {str(e)}")
+
+    # render empty form
+    return render_template('pages/subscribe.html')
 
 @bp.route('/fetch-data', methods=['GET'])
 def fetch_data():

@@ -1,8 +1,8 @@
 {% extends 'base.html' %}
 
-
+{% block title %}Home{% endblock %}
 {% block header %}
-  <h1 class = "header">{% block title %}<span class="red-text">Cloud-based Monitoring System</span> <br> for Traffic Control in Peachtree Corners{% endblock title %}</h1>
+  <h1 class = "header"><span class="red-text">Cloud-based Monitoring System</span> <br> for Traffic Control in Peachtree Corners</h1>
 {% endblock header %}
 
 {% block content %}
@@ -28,7 +28,7 @@
       <h3>ESTIMATE CARBON EMISSIONS</h3>
       <p>Measure emissions based on the sensor data</p>
     </a>
-    <a class="home-block-item" href="{{ url_for('pages.dashboard') }}">
+    <a class="home-block-item" href="{{ url_for('pages.subscribe') }}">
       <img src="{{ url_for('static', filename='images/email.svg') }}" alt="email svg">
       <h3>SUBSCRIBE NOW</h3>
       <p>Receive weekly updates directly to your inbox</p>
