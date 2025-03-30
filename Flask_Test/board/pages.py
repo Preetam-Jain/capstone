@@ -17,6 +17,10 @@ def about():
 def dashboard():
     return render_template("pages/dashboard.html")
 
+@bp.route("/carbon-emissions")
+def carbon_emissions():
+    return render_template("pages/carbon_emissions.html")
+
 @bp.route('/subscribe', methods=['GET', 'POST'])
 def subscribe():
     if request.method == 'POST':

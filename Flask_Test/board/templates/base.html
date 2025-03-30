@@ -8,23 +8,16 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body class="main-page">
-<div class="left-page">
-  
-
   {% include("_navigation.html") %}
-</div>
 
-
-
-<section>
-  <header>
-    <div id="header-fade">{% block header %}{% endblock header %}</div>
-  </header>
-  <main>
-    <div id="fade-container"> {% block content %}<p>No messages.</p>{% endblock content %}</div>
-  </main>
-</section>
-</div>
+  <div class="content-area">
+    <header>
+      <div id="header-fade">{% block header %}{% endblock header %}</div>
+    </header>
+    <main>
+      <div id="fade-container">{% block content %}<p>No messages.</p>{% endblock content %}</div>
+    </main>
+  </div>
 
 <!-- For animation of pages = fading in -->
 <script>
@@ -36,6 +29,7 @@
     if (header) header.classList.add("fade-in");
   });
 </script>
+
 
 </body>
 </html>
