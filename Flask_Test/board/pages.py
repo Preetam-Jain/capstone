@@ -7,8 +7,12 @@ import time
 import pandas as pd
 from flask_mail import Message
 from board.mail import mail
+from apscheduler.schedulers.background import BackgroundScheduler
 
 bp = Blueprint("pages", __name__)
+
+scheduler = BackgroundScheduler()
+scheduler.start()
 
 @bp.route("/")
 def home():
@@ -204,8 +208,10 @@ def subscribe():
         subject = "Subscription Confirmed"
         body = f"Hello {first_name},\n\nThank you for subscribing to the weekly reports from the Capstone - Traffic Monitoring Dashboard!"
 
-        msg = Message(subject=subject, sender="testingcapstonedesign@gmail.com", recipients=[email])
+        msg = Message(subject=subject, sender="capstonetestingtester@gmail.com", recipients=[email])
         msg.body = body
+        
+        scheduler.add_job(sendWeeklyUpdate, 'interval', seconds=10)
 
         try:
             mail.send(msg)
@@ -215,6 +221,19 @@ def subscribe():
 
     # render empty form
     return render_template('pages/subscribe.html')
+
+def sendWeeklyUpdate():
+    subject = "Weekly Progress Report"
+    body = f"Weekly reports from the Capstone - Traffic Monitoring Dashboard!"
+
+    msg = Message(subject=subject, sender="capstonetestingtester@gmail.com", recipients="amr2101@gmail.com")
+    msg.body = body
+
+    try:
+        mail.send(msg)
+        return render_template('pages/subscribe.html', success="You've been subscribed successfully!")
+    except Exception as e:
+        return render_template('pages/subscribe.html', error=f"Failed to send email: {str(e)}")
 
 @bp.route('/fetch-data', methods=['GET'])
 def fetch_data():
@@ -259,7 +278,7 @@ def send_email():
     if not recipient:
         return jsonify({"error": "Recipient email is required"}), 400
 
-    msg = Message(subject=subject, sender="testingcapstonedesign@gmail.com", recipients=[recipient])
+    msg = Message(subject=subject, sender="capstonetestingtester@gmail.com", recipients=[recipient])
     msg.body = body
 
     try:
