@@ -419,7 +419,7 @@ def fetch_data():
 @bp.route('/send-data', methods=['POST'])
 def send_data():
     url = "https://testapi.io/api/aam08331/Testapi"
-    data = {"name": "John", "age": 30}
+    data = {"test": "test", "num": 1}
 
     try:
         response = requests.post(url, json=data, timeout=5)
