@@ -8,11 +8,16 @@ import pandas as pd
 from flask_mail import Message
 from board.mail import mail
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
+#from board import app
+from flask import current_app
 
 bp = Blueprint("pages", __name__)
 
 scheduler = BackgroundScheduler()
 scheduler.start()
+
+emails = []
 
 @bp.route("/")
 def home():
@@ -194,8 +199,12 @@ def dashboard():
 def carbon_emissions():
     return render_template("pages/carbon_emissions.html")
 
+job = None
+
 @bp.route('/subscribe', methods=['GET', 'POST'])
 def subscribe():
+    global job
+    global emails
     if request.method == 'POST':
         first_name = request.form.get('first_name')
         last_name = request.form.get('last_name')
@@ -203,37 +212,46 @@ def subscribe():
 
         if not first_name or not last_name or not email:
             return render_template('pages/subscribe.html', error="All fields are required.")
+        if(not email in emails):
+            emails.append(email)
+            # construct confirmation email 
+            subject = "Subscription Confirmed"
+            body = f"Hello {first_name},\n\nThank you for subscribing to the weekly reports from the Capstone - Traffic Monitoring Dashboard!"
 
-        # construct confirmation email 
-        subject = "Subscription Confirmed"
-        body = f"Hello {first_name},\n\nThank you for subscribing to the weekly reports from the Capstone - Traffic Monitoring Dashboard!"
+            msg = Message(subject=subject, sender="capstonetestingtester@gmail.com", recipients=[email])
+            msg.body = body
+            if(not job):
+                scheduler.add_job(
+                        sendWeeklyUpdate, 
+                        trigger=CronTrigger(day_of_week='sun', hour=0, minute=27),
+                        args=[current_app._get_current_object(), email],
+                        max_instances=1  
+                )
+                job = 1
 
-        msg = Message(subject=subject, sender="capstonetestingtester@gmail.com", recipients=[email])
-        msg.body = body
-        
-        scheduler.add_job(sendWeeklyUpdate, 'interval', seconds=10)
-
-        try:
-            mail.send(msg)
-            return render_template('pages/subscribe.html', success="You've been subscribed successfully!")
-        except Exception as e:
-            return render_template('pages/subscribe.html', error=f"Failed to send email: {str(e)}")
-
+            try:
+                mail.send(msg)
+                return render_template('pages/subscribe.html', success="You've been subscribed successfully!")
+            except Exception as e:
+                return render_template('pages/subscribe.html', error=f"Failed to send email: {str(e)}")
+        else:
+            return render_template('pages/subscribe.html', error="Email already set for subscription")
     # render empty form
     return render_template('pages/subscribe.html')
 
-def sendWeeklyUpdate():
-    subject = "Weekly Progress Report"
-    body = f"Weekly reports from the Capstone - Traffic Monitoring Dashboard!"
+def sendWeeklyUpdate(app, email):
+    with app.app_context():
+        subject = "Weekly Progress Report"
+        body = f"Weekly reports from the Capstone - Traffic Monitoring Dashboard!"
 
-    msg = Message(subject=subject, sender="capstonetestingtester@gmail.com", recipients="amr2101@gmail.com")
-    msg.body = body
+        msg = Message(subject=subject, sender="capstonetestingtester@gmail.com", recipients=[email])
+        msg.body = body
 
-    try:
-        mail.send(msg)
-        return render_template('pages/subscribe.html', success="You've been subscribed successfully!")
-    except Exception as e:
-        return render_template('pages/subscribe.html', error=f"Failed to send email: {str(e)}")
+        try:
+            mail.send(msg)
+            print("Weekly update sent")
+        except Exception as e:
+            print(f"Weekly update failed: {str(e)}")
 
 @bp.route('/fetch-data', methods=['GET'])
 def fetch_data():
