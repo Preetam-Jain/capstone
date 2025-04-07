@@ -21,71 +21,213 @@
   </p>
 </section>
 
-<!-- Second Section: Chart -->
+<!-- Second Section: Chart with Loading Screen -->
 <section class="carbon-section">
   <h3 class="carbon-section-title">CO₂ Emissions Over Time</h3>
-  <div id="co2-emissions-chart" class="chart-placeholder">
-    <em>[Chart placeholder]</em>
+  <div id="loading-screen">
+    <p>Loading... Scraping data and fetching kWh telemetry, please wait.</p>
+  </div>
+  <div id="dashboard-content" style="display: none;">
+    <canvas id="chartCarbon" width="600" height="400"></canvas>
+    <p id="no-data-message" style="display: none; color: red;">No telemetry data available.</p>
   </div>
 </section>
 
-<!-- Third Section: More Details -->
-<div class="carbon-container responsive-split">
- 
-  <section class="carbon-section">
-    <h3 class="carbon-section-title">How are Carbon Emissions Calculated?</h3>
-    <p>We use the following formula to estimate emissions:</p>
-    <p class="formula">Carbon Emissions (lbs CO₂) = Emission Factor × Conversion (Tons to Pounds) × Energy Consumption (kWh)</p>
-    
-    <ul class="no-bullets">
-      <li><strong>Emission Factor:</strong> Based on Georgia's regional electricity mix = 3.94 × 10<sup>-4</sup></li>
-      <li><strong>Conversion (Tons to Pounds):</strong> 2000 </li>
-      <li><strong>Energy Consumption:</strong> From sensor data (measured in kWh)</li>
-      <li><strong>Location:</strong> Peachtree Corners, 30092</li>
-    </ul>
-  </section>
-  
+<!-- Third Section: Calculation Method -->
+<section class="carbon-section">
+  <h3 class="carbon-section-title">How are Carbon Emissions Calculated?</h3>
+  <p>We use the following formula to estimate emissions:</p>
+  <p class="formula">Carbon Emissions (lbs CO₂) = Emission Factor × Conversion (Tons to Pounds) × Energy Consumption (kWh)</p>
 
-  <div class="carbon-right">
-    <section class="carbon-section">
-      <h3 class="carbon-section-title">What is this equivalent to?</h3>
-      <section class="equivalent-section">
-      
-        <div class="equivalent-grid">
-          <div class="equiv-box">
-          
-            <div class="equiv-icon">🚗</div>
-            <div class="equiv-number">XX</div>
-            
-            <div class="equiv-desc">Cars on the road</div>
-          </div>
-      
-          <div class="equiv-box">
-            <div class="equiv-icon">🌳</div>
-            <div class="equiv-number">XX</div>
-            
-            <div class="equiv-desc">Trees needed to offset</div>
-          </div>
-      
-          <div class="equiv-box">
-            <div class="equiv-icon">🎈</div>
-            <div class="equiv-number">XX</div>
-            
-            <div class="equiv-desc">Balloons filled with CO₂</div>
-          </div>
-      
-          <div class="equiv-box">
-            <div class="equiv-icon">🚿</div>
-            <div class="equiv-number">XX</div>
-            
-            <div class="equiv-desc">Showers taken</div>
-          </div>
-        </div>
-      </section>
-      
-    </section>
-  
-</div>
+  <ul class="no-bullets">
+    <li><strong>Emission Factor:</strong> Based on Georgia's regional electricity mix = 3.94 × 10<sup>-4</sup></li>
+    <li><strong>Conversion (Tons to Pounds):</strong> 2000 </li>
+    <li><strong>Energy Consumption:</strong> From sensor data (measured in kWh)</li>
+    <li><strong>Location:</strong> Peachtree Corners, 30092</li>
+  </ul>
+</section>
+
+<hr>
+
+<!-- Equivalents Section -->
+<section class="equivalent-section">
+  <h3>What is this equivalent to?</h3>
+  <div class="equivalent-grid" id="equivalent-stats">
+    <div class="equiv-box">
+      <div class="equiv-icon">🚗</div>
+      <div class="equiv-number" id="cars-equivalent">--</div>
+      <div class="equiv-desc">Cars on the road</div>
+    </div>
+    <div class="equiv-box">
+      <div class="equiv-icon">🌳</div>
+      <div class="equiv-number" id="trees-equivalent">--</div>
+      <div class="equiv-desc">Trees needed to offset</div>
+    </div>
+    <div class="equiv-box">
+      <div class="equiv-icon">🎈</div>
+      <div class="equiv-number" id="balloons-equivalent">--</div>
+      <div class="equiv-desc">Balloons filled with CO₂</div>
+    </div>
+    <div class="equiv-box">
+      <div class="equiv-icon">🚿</div>
+      <div class="equiv-number" id="showers-equivalent">--</div>
+      <div class="equiv-desc">Showers taken</div>
+    </div>
+  </div>
+</section>
+
+<!-- Chart Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/luxon@3/build/global/luxon.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1"></script>
+<script>
+  let carbonChartInstance = null;
+  let jobStarted = false;
+  let hasRun = false;
+
+  document.addEventListener("DOMContentLoaded", () => {
+    runFreshScrape();
+  });
+
+  function runFreshScrape() {
+    if (hasRun) return;
+    hasRun = true;
+    jobStarted = false;
+    startScrapeJob();
+  }
+
+  async function startScrapeJob() {
+    if (jobStarted) return;
+    jobStarted = true;
+
+    document.getElementById("loading-screen").style.display = "block";
+    document.getElementById("dashboard-content").style.display = "none";
+    document.getElementById("no-data-message").style.display = "none";
+    document.getElementById("chartCarbon").style.display = "block";
+
+    try {
+      const response = await fetch("/start_scrape", { method: "POST" });
+      const data = await response.json();
+      if (data.job_id) pollScrapeStatus(data.job_id);
+    } catch (err) {
+      console.error("Scrape error", err);
+    }
+  }
+
+  async function pollScrapeStatus(jobId) {
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch(`/scrape_status?job_id=${jobId}`);
+        const data = await response.json();
+        if (data.status === "complete") {
+          clearInterval(interval);
+          document.getElementById("loading-screen").style.display = "none";
+          document.getElementById("dashboard-content").style.display = "block";
+          if (data.result && data.result.telemetry_data && Object.keys(data.result.telemetry_data).length > 0) {
+            processCarbonData(data.result.telemetry_data);
+          } else {
+            document.getElementById("no-data-message").style.display = "block";
+            document.getElementById("chartCarbon").style.display = "none";
+          }
+        }
+      } catch (err) {
+        console.error("Polling error", err);
+        clearInterval(interval);
+      }
+    }, 3000);
+  }
+
+  function processCarbonData(telemetryData) {
+    if (carbonChartInstance) {
+      carbonChartInstance.destroy();
+    }
+
+    const endpoints = telemetryData;
+    const seriesData = {};
+    const usedNames = new Set();
+
+    for (const url in endpoints) {
+      const apiResponse = endpoints[url];
+      if (!apiResponse) continue;
+
+      const items = Array.isArray(apiResponse) ? apiResponse : apiResponse.items;
+      if (!items || !Array.isArray(items)) continue;
+
+      for (const item of items) {
+        const name = item.name?.toLowerCase() || "";
+        if (!name.includes("kwh") || usedNames.has(item.name)) continue;
+        usedNames.add(item.name);
+
+        const series = item.items;
+        if (!series || !Array.isArray(series)) continue;
+
+        const dataPoints = series.map(dp => {
+          const kwh = parseFloat(dp.average);
+          const timestamp = dp.timestamp ? new Date(dp.timestamp) : null;
+          if (!isNaN(kwh) && timestamp) {
+            const co2 = kwh * 3.94e-4 * 2000;
+            return { x: timestamp, y: co2 };
+          }
+          return null;
+        }).filter(pt => pt !== null);
+
+        if (dataPoints.length > 0) {
+          seriesData[item.name] = dataPoints;
+        }
+      }
+    }
+
+    if (Object.keys(seriesData).length === 0) {
+      document.getElementById("loading-screen").style.display = "none";
+      document.getElementById("dashboard-content").style.display = "block";
+      document.getElementById("no-data-message").style.display = "block";
+      document.getElementById("chartCarbon").style.display = "none";
+      return;
+    }
+
+    const allPoints = Object.values(seriesData).flat();
+    allPoints.sort((a, b) => a.x - b.x);
+
+    const totalEmissions = allPoints.reduce((sum, pt) => sum + pt.y, 0);
+    // passenger cars emits around 845 pounds of co2 a month
+    document.getElementById("cars-equivalent").innerText = (totalEmissions / 845).toFixed(2);
+    // average tree absorbs 48 pounds of co2 a year
+    document.getElementById("trees-equivalent").innerText = (totalEmissions / 48).toFixed(2);
+    // balloon holds 0.004 pounds of co2
+    document.getElementById("balloons-equivalent").innerText = Math.round(totalEmissions / 0.004).toLocaleString();
+    // for 10-minute showers
+    document.getElementById("showers-equivalent").innerText = (totalEmissions / 2.535316).toFixed(2);
+
+    const datasets = Object.keys(seriesData).map((key) => ({
+      label: key + " (lbs CO₂)",
+      data: seriesData[key],
+      borderWidth: 2,
+      fill: false,
+      hidden: false
+    }));
+
+    carbonChartInstance = new Chart(document.getElementById("chartCarbon").getContext("2d"), {
+      type: "line",
+      data: { datasets },
+      options: {
+        scales: {
+          x: {
+            type: "time",
+            time: {
+              tooltipFormat: "ll HH:mm",
+              displayFormats: { hour: 'MMM d, hA' }
+            },
+            title: { display: true, text: "Timestamp" }
+          },
+          y: {
+            title: { display: true, text: "Emissions (lbs CO₂)" }
+          }
+        }
+      }
+    });
+  }
+</script>
 
 {% endblock content %}
+
 
