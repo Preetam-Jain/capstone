@@ -23,12 +23,13 @@
 
 <!-- Second Section: Chart with Loading Screen -->
 <section class="carbon-section">
-  <h3 class="carbon-section-title">CO₂ Emissions Over Time</h3>
+  <h3 class="carbon-section-title">CO₂ Emissions Over Time (Per Day)</h3>
   <div id="loading-screen">
     <p>Loading... Scraping data and fetching kWh telemetry, please wait.</p>
   </div>
   <div id="dashboard-content" style="display: none;">
     <canvas id="chartCarbon" width="600" height="400"></canvas>
+
     <p id="no-data-message" style="display: none; color: red;">No telemetry data available.</p>
   </div>
 </section>
@@ -52,6 +53,7 @@
 <!-- Equivalents Section -->
 <section class="equivalent-section">
   <h3>What is this equivalent to?</h3>
+  <h3>Total co2 Used: <span id="total-co2">--</span></h3>
   <div class="equivalent-grid" id="equivalent-stats">
     <div class="equiv-box">
       <div class="equiv-icon">🚗</div>
@@ -80,7 +82,9 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/luxon@3/build/global/luxon.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1"></script>
+
 <script>
+  console.log("script running");
   let carbonChartInstance = null;
   let jobStarted = false;
   let hasRun = false;
@@ -96,6 +100,7 @@
     startScrapeJob();
   }
 
+  console.log("starting scrape job...");
   async function startScrapeJob() {
     if (jobStarted) return;
     jobStarted = true;
@@ -124,6 +129,7 @@
           document.getElementById("loading-screen").style.display = "none";
           document.getElementById("dashboard-content").style.display = "block";
           if (data.result && data.result.telemetry_data && Object.keys(data.result.telemetry_data).length > 0) {
+            
             processCarbonData(data.result.telemetry_data);
           } else {
             document.getElementById("no-data-message").style.display = "block";
@@ -137,87 +143,111 @@
     }, 3000);
   }
 
+  
+
+
+  // process the carbon data
   function processCarbonData(telemetryData) {
     if (carbonChartInstance) {
       carbonChartInstance.destroy();
     }
-
-    const endpoints = telemetryData;
-    const seriesData = {};
-    const usedNames = new Set();
-
-    for (const url in endpoints) {
-      const apiResponse = endpoints[url];
-      if (!apiResponse) continue;
-
-      const items = Array.isArray(apiResponse) ? apiResponse : apiResponse.items;
-      if (!items || !Array.isArray(items)) continue;
-
-      for (const item of items) {
-        const name = item.name?.toLowerCase() || "";
-        if (!name.includes("kwh") || usedNames.has(item.name)) continue;
-        usedNames.add(item.name);
-
-        const series = item.items;
-        if (!series || !Array.isArray(series)) continue;
-
-        const dataPoints = series.map(dp => {
-          const kwh = parseFloat(dp.average);
-          const timestamp = dp.timestamp ? new Date(dp.timestamp) : null;
-          if (!isNaN(kwh) && timestamp) {
-            const co2 = kwh * 3.94e-4 * 2000;
-            return { x: timestamp, y: co2 };
+  
+    const dailyTotals = {}; // { "YYYY-MM-DD": { currentSum: X, count: Y } }
+    let totalCO2 = 0;
+    let totalKWh = 0;
+    const today = new Date().toISOString().split("T")[0];
+  
+    for (const url in telemetryData) {
+      const endpoint = Array.isArray(telemetryData[url]) ? telemetryData[url] : telemetryData[url].items;
+      if (!endpoint) continue;
+  
+      for (const item of endpoint) {
+        const name = item.name?.toLowerCase();
+        if (!name || !name.includes("ampere_1")) continue;
+  
+        for (const reading of item.items || []) {
+          const ts = new Date(reading.timestamp);
+          const avg = parseFloat(reading.average) / 100;
+          if (!ts || isNaN(avg)) continue;
+  
+          const dayKey = ts.toISOString().split("T")[0];
+          if (dayKey === today) continue;
+  
+          if (!dailyTotals[dayKey]) {
+            dailyTotals[dayKey] = { currentSum: 0, count: 0 };
           }
-          return null;
-        }).filter(pt => pt !== null);
-
-        if (dataPoints.length > 0) {
-          seriesData[item.name] = dataPoints;
+          dailyTotals[dayKey].currentSum += avg;
+          dailyTotals[dayKey].count += 1;
         }
       }
     }
-
-    if (Object.keys(seriesData).length === 0) {
+  
+    const seriesData = [];
+  
+    for (const day in dailyTotals) {
+      // calculates total co2 per day
+      const { currentSum, count } = dailyTotals[day];
+      const avgCurrent = currentSum / count;
+      const powerKW = (1.732 * 120 * avgCurrent * 0.95) / 1000;
+      const kWh = powerKW * 24;
+      const co2 = kWh * 3.94e-4 * 2000;
+  
+      totalKWh += kWh;
+      totalCO2 += co2;
+  
+      console.log(`Date: ${day}, Avg A: ${avgCurrent.toFixed(2)}, kWh: ${kWh.toFixed(2)}, CO₂: ${co2.toFixed(3)}`);
+  
+      seriesData.push({ x: new Date(day), y: co2 });
+    }
+  
+    seriesData.sort((a, b) => a.x - b.x);
+  
+    if (seriesData.length === 0) {
       document.getElementById("loading-screen").style.display = "none";
       document.getElementById("dashboard-content").style.display = "block";
       document.getElementById("no-data-message").style.display = "block";
       document.getElementById("chartCarbon").style.display = "none";
       return;
     }
+  
+    // Equivalents 
+    // per month
+    document.getElementById("cars-equivalent").innerText = (totalCO2 / 19.6).toFixed(2);
+    // per month 
+    document.getElementById("trees-equivalent").innerText = (totalCO2 / 48).toFixed(2);
 
-    const allPoints = Object.values(seriesData).flat();
-    allPoints.sort((a, b) => a.x - b.x);
-
-    const totalEmissions = allPoints.reduce((sum, pt) => sum + pt.y, 0);
-    // passenger cars emits around 845 pounds of co2 a month
-    document.getElementById("cars-equivalent").innerText = (totalEmissions / 845).toFixed(2);
-    // average tree absorbs 48 pounds of co2 a year
-    document.getElementById("trees-equivalent").innerText = (totalEmissions / 48).toFixed(2);
-    // balloon holds 0.004 pounds of co2
-    document.getElementById("balloons-equivalent").innerText = Math.round(totalEmissions / 0.004).toLocaleString();
-    // for 10-minute showers
-    document.getElementById("showers-equivalent").innerText = (totalEmissions / 2.535316).toFixed(2);
-
-    const datasets = Object.keys(seriesData).map((key) => ({
-      label: key + " (lbs CO₂)",
-      data: seriesData[key],
-      borderWidth: 2,
-      fill: false,
-      hidden: false
-    }));
-
+    document.getElementById("balloons-equivalent").innerText = Math.round(totalCO2 / 0.06).toLocaleString();
+    // 10 minute shower
+    document.getElementById("showers-equivalent").innerText = (totalCO2 / 4.25).toFixed(2);
+  
+    const co2Display = document.getElementById("total-co2");
+    if (co2Display) {
+      co2Display.innerText = totalCO2.toFixed(2);
+    }
+  
+    // Chart
     carbonChartInstance = new Chart(document.getElementById("chartCarbon").getContext("2d"), {
       type: "line",
-      data: { datasets },
+      data: {
+        datasets: [{
+          label: "Daily Carbon Emissions (lbs CO₂)",
+          data: seriesData,
+          borderWidth: 2,
+          fill: false,
+          tension: 0.1,
+          pointRadius: 4
+        }]
+      },
       options: {
         scales: {
           x: {
             type: "time",
             time: {
-              tooltipFormat: "ll HH:mm",
-              displayFormats: { hour: 'MMM d, hA' }
+              tooltipFormat: "MMM d, yyyy",
+              unit: "day",
+              displayFormats: { day: "MMM d" }
             },
-            title: { display: true, text: "Timestamp" }
+            title: { display: true, text: "Date" }
           },
           y: {
             title: { display: true, text: "Emissions (lbs CO₂)" }
@@ -226,6 +256,14 @@
       }
     });
   }
+  
+  
+  
+  
+  
+  
+  
+  
 </script>
 
 {% endblock content %}
