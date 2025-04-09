@@ -105,17 +105,15 @@
 
     /**
      * 3) Process the telemetry data:
-     *    - Parse endpoints, removing duplicates
-     *    - Partition into "currents" vs. "temperatures"
-     *    - Render two separate charts
+     *    - Parse endpoints while keeping all assetIDs.
+     *    - For each endpoint, take only the first items list (as that contains the relevant values).
+     *    - Filter out data points with value 0 or -2.
+     *    - Build a composite key (assetID + telemetry name) so that different assets don’t overwrite each other.
+     *    - Partition into "currents" vs. "temperatures" and render charts.
      */
     function processTelemetryData(telemetryData) {
-      const allEndpoints = telemetryData;
-      console.log("Merged endpoints:", allEndpoints);
-
-      // parse and remove duplicates
-      const seriesData = parseAllEndpointsNoDuplicates(allEndpoints);
-      console.log("Parsed series data (no duplicates):", seriesData);
+      const seriesData = parseAllEndpointsNoDuplicates(telemetryData);
+      console.log("Parsed series data (per asset):", seriesData);
 
       if (Object.keys(seriesData).length === 0) {
         document.getElementById("no-data-message").style.display = "block";
@@ -137,7 +135,6 @@
       console.log("Currents series:", currents);
       console.log("Temperatures series:", temperatures);
 
-      // Render or show "no data" for each
       if (Object.keys(currents).length > 0) {
         renderChart(currents, "chartCurrents", "currents");
       } else {
@@ -153,85 +150,58 @@
 
     /**
      * 4) Render a chart for either "currents" or "temperatures"
-     *    - For currents: divide values by 100, rename series properly
-     *    - For temperatures: divide values by 10, skip all-zero series, rename as "Temperature (°F)"
+     *    Hardcoded names based on insertion order:
+     *      - For currents (by order): 
+     *             1st: "Traffic Controller Current (A)"
+     *             2nd: "Total Current (A)"
+     *             3rd: "Auxiliary Current (A)"
+     *      - For temperatures (by order):
+     *             1st: "Temperature (°F)"
+     *             2nd: "Humidity (%)"
      */
     function renderChart(dataObject, canvasId, typeStr) {
       const datasets = [];
-
-      for (const seriesName in dataObject) {
+      // Use insertion order—do not sort
+      const seriesKeys = Object.keys(dataObject);
+      
+      seriesKeys.forEach((seriesName, index) => {
         let dataPoints = dataObject[seriesName];
 
         if (typeStr === "currents") {
-          // scale each point by 1/100
+          // Scale current values by dividing by 100
           dataPoints = dataPoints.map(pt => ({ x: pt.x, y: pt.y / 100 }));
-          // rename based on "ampere_1", "ampere_2", "ampere_3"
-          const lower = seriesName.toLowerCase();
           let newLabel;
-          if (lower.includes("ampere_1")) {
-            newLabel = "Traffic Controller Current (A)";
-          } else if (lower.includes("ampere_2")) {
-            newLabel = "Total Current (A)";
-          } else if (lower.includes("ampere_3")) {
-            newLabel = "Auxiliary Current (A)";
-          } else {
-            // fallback if there's an odd naming pattern
-            newLabel = seriesName + " (A)";
-          }
-          datasets.push({
-            label: newLabel,
-            data: dataPoints,
-            borderWidth: 2,
-            fill: false,
-            hidden: false
-          });
-
+          if (index === 0) newLabel = "Traffic Controller Current (A)";
+          else if (index === 1) newLabel = "Total Current (A)";
+          else if (index === 2) newLabel = "Auxiliary Current (A)";
+          else newLabel = seriesName + " (A)";
+          datasets.push({ label: newLabel, data: dataPoints, borderWidth: 2, fill: false });
         } else if (typeStr === "temperatures") {
-          // scale each point by 1/10
+          // Scale temperature values by dividing by 10
           dataPoints = dataPoints.map(pt => ({ x: pt.x, y: pt.y / 10 }));
-
-          // Check if this entire series is zero. If so, skip it
           const anyNonZero = dataPoints.some(pt => pt.y !== 0);
           if (!anyNonZero) {
             console.log(`Skipping temperature series "${seriesName}" because all points are zero.`);
-            continue;
+            return;
           }
-
-          // We label all temperature lines the same
-          datasets.push({
-            label: "Temperature (°F)",
-            data: dataPoints,
-            borderWidth: 2,
-            fill: false,
-            hidden: false
-          });
-
+          let newLabel;
+          if (index === 0) newLabel = "Temperature (°F)";
+          else if (index === 1) newLabel = "Humidity (%)";
+          else newLabel = seriesName;
+          datasets.push({ label: newLabel, data: dataPoints, borderWidth: 2, fill: false });
         } else {
-          // fallback if needed
-          datasets.push({
-            label: seriesName,
-            data: dataPoints,
-            borderWidth: 2,
-            fill: false,
-            hidden: false
-          });
+          datasets.push({ label: seriesName, data: dataPoints, borderWidth: 2, fill: false });
         }
-      }
+      });
 
-      // If no valid datasets remain, show a "no data" message
       if (datasets.length === 0) {
         document.getElementById(canvasId).outerHTML = `<p>No data available for ${typeStr}.</p>`;
         return;
       }
 
-      // Destroy existing chart if it exists
-      if ((typeStr === "currents" && chartCurrents) ||
-          (typeStr === "temperatures" && chartTemperatures)) {
-        if (typeStr === "currents") chartCurrents.destroy();
-        if (typeStr === "temperatures") chartTemperatures.destroy();
-      }
+      if (typeStr === "currents" && chartCurrents) chartCurrents.destroy();
+      if (typeStr === "temperatures" && chartTemperatures) chartTemperatures.destroy();
 
-      // Create new chart
       const ctx = document.getElementById(canvasId).getContext("2d");
       const chartInstance = new Chart(ctx, {
         type: "line",
@@ -240,26 +210,16 @@
           scales: {
             x: {
               type: "time",
-              time: {
-                tooltipFormat: "ll HH:mm",
-                displayFormats: { hour: 'MMM d, hA' }
-              },
-              title: {
-                display: true,
-                text: "Timestamp"
-              }
+              time: { tooltipFormat: "ll HH:mm", displayFormats: { hour: "MMM d, hA" } },
+              title: { display: true, text: "Timestamp" }
             },
             y: {
-              title: {
-                display: true,
-                text: (typeStr === "currents") ? "Current (A)" : "Temperature (°F)"
-              }
+              title: { display: true, text: typeStr === "currents" ? "Current (A)" : "Temperature (°F)" }
             }
           }
         }
       });
 
-      // Store chart + build checkboxes
       if (typeStr === "currents") {
         chartCurrents = chartInstance;
         currentDatasets = datasets;
@@ -272,15 +232,23 @@
     }
 
     /**
-     * 5) Parse endpoints, removing duplicates by item name
+     * 5) Parse endpoints, processing each asset's telemetry:
+     *    - Extracts the asset ID from the URL.
+     *    - For each endpoint, it takes only the first items list (assuming that contains the relevant values).
+     *    - Filters out data points with value 0 or -2.
+     *    - Uses a composite key (assetID + telemetry name) so that each asset's series is kept.
+     *    - If item.name is missing, extract the first telemetryId from the URL.
      */
     function parseAllEndpointsNoDuplicates(endpoints) {
       const seriesData = {};
-      const usedNames = new Set();
 
       for (const url in endpoints) {
         const apiResponse = endpoints[url];
         if (!apiResponse) continue;
+
+        // Extract asset ID from the URL using a regular expression
+        const assetMatch = url.match(/\/assets\/([^/]+)/);
+        const assetID = assetMatch ? assetMatch[1] : "UnknownAsset";
 
         let topLevelItems = [];
         if (Array.isArray(apiResponse)) {
@@ -291,27 +259,33 @@
           continue;
         }
 
-        topLevelItems.forEach(item => {
-          const itemName = item.name || "UnknownItem";
-          if (usedNames.has(itemName)) return; // skip duplicates
-          usedNames.add(itemName);
-
-          if (!item.items || !Array.isArray(item.items)) return;
-
-          // build data points
-          const dataPoints = item.items.map(dp => {
-            const val = parseFloat(dp.average);
-            const dateObj = dp.timestamp ? new Date(dp.timestamp) : null;
-            if (!dateObj || isNaN(val)) return null;
-            return { x: dateObj, y: val };
-          }).filter(pt => pt !== null);
-
-          dataPoints.sort((a, b) => a.x - b.x);
-
-          if (dataPoints.length > 0) {
-            seriesData[itemName] = dataPoints;
+        if (topLevelItems.length > 0) {
+          // Only process the first items list from this endpoint
+          const item = topLevelItems[0];
+          // If item.name is not provided, attempt to extract the first telemetryId from the URL
+          let itemName = item.name;
+          if (!itemName) {
+            const telemetryMatch = url.match(/telemetryIds=([^&]+)/);
+            itemName = telemetryMatch ? telemetryMatch[1].toLowerCase() : "unknown";
           }
-        });
+          // Build a composite key: assetID + "_" + itemName
+          const compositeKey = assetID + "_" + itemName;
+
+          const filteredPoints = item.items
+            .map(dp => {
+              const val = parseFloat(dp.average);
+              const dateObj = dp.timestamp ? new Date(dp.timestamp) : null;
+              if (!dateObj || isNaN(val)) return null;
+              if (val === 0 || val === -2) return null;
+              return { x: dateObj, y: val };
+            })
+            .filter(pt => pt !== null)
+            .sort((a, b) => a.x - b.x);
+
+          if (!seriesData.hasOwnProperty(compositeKey)) {
+            seriesData[compositeKey] = filteredPoints;
+          }
+        }
       }
 
       return seriesData;
@@ -331,7 +305,7 @@
 
         const checkbox = document.createElement("input");
         checkbox.type = "checkbox";
-        checkbox.checked = !ds.hidden;
+        checkbox.checked = true;
         checkbox.dataset.index = index;
         checkbox.onchange = (e) => {
           const idx = parseInt(e.target.dataset.index, 10);
@@ -339,9 +313,8 @@
           chartInstance.update();
         };
 
-        const text = document.createTextNode(" " + ds.label);
         label.appendChild(checkbox);
-        label.appendChild(text);
+        label.appendChild(document.createTextNode(" " + ds.label));
         container.appendChild(label);
       });
     }
