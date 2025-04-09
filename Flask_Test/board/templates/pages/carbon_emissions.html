@@ -148,22 +148,28 @@
 
   // process the carbon data
   function processCarbonData(telemetryData) {
+    telemetryData = parseAllEndpointsNoDuplicates(telemetryData); // parsed it
     if (carbonChartInstance) {
       carbonChartInstance.destroy();
     }
   
     const dailyTotals = {}; // { "YYYY-MM-DD": { currentSum: X, count: Y } }
-    let totalCO2 = 0;
+    let totalCO2 = 0; // to show in equivalency table at the bottom
     let totalKWh = 0;
     const today = new Date().toISOString().split("T")[0];
   
+    
     for (const url in telemetryData) {
       const endpoint = Array.isArray(telemetryData[url]) ? telemetryData[url] : telemetryData[url].items;
       if (!endpoint) continue;
   
       for (const item of endpoint) {
         const name = item.name?.toLowerCase();
-        if (!name || !name.includes("ampere_2")) continue;
+        if (!name || !name.includes("ampere")) continue;
+
+
+        // total current only
+        if (index === 1) { 
   
         for (const reading of item.items || []) {
           const ts = new Date(reading.timestamp);
@@ -181,6 +187,7 @@
         }
       }
     }
+  }
   
     const seriesData = [];
   
@@ -201,7 +208,7 @@
     }
   
     seriesData.sort((a, b) => a.x - b.x);
-  
+    
     if (seriesData.length === 0) {
       document.getElementById("loading-screen").style.display = "none";
       document.getElementById("dashboard-content").style.display = "block";
@@ -209,6 +216,7 @@
       document.getElementById("chartCarbon").style.display = "none";
       return;
     }
+  
   
     // Equivalents 
     // per month
