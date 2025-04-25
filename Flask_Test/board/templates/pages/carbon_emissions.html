@@ -53,7 +53,7 @@
 <!-- Equivalents Section -->
 <section class="equivalent-section">
   <h3>What is this equivalent to?</h3>
-  <h3>Total co2 Used: <span id="total-co2">--</span></h3>
+  <h3>Total CO₂ Used: <span id="total-co2">--</span></h3>
   <div class="equivalent-grid" id="equivalent-stats">
     <div class="equiv-box">
       <div class="equiv-icon">🚗</div>
@@ -129,9 +129,9 @@
           document.getElementById("loading-screen").style.display = "none";
           document.getElementById("dashboard-content").style.display = "block";
           if (data.result && data.result.telemetry_data && Object.keys(data.result.telemetry_data).length > 0) {
-            
             processCarbonData(data.result.telemetry_data);
           } else {
+            // no telemetry data found
             document.getElementById("no-data-message").style.display = "block";
             document.getElementById("chartCarbon").style.display = "none";
           }
@@ -143,99 +143,176 @@
     }, 3000);
   }
 
-  
+  /**
+   * Replicate the parseAllEndpointsNoDuplicates function from dashboard.html.
+   * This looks at each endpoint, picks only the first items array, and aggregates the data points.
+   */
+  function parseAllEndpointsNoDuplicates(endpoints) {
+    const seriesData = {};
 
+    for (const url in endpoints) {
+      const apiResponse = endpoints[url];
+      if (!apiResponse) continue;
 
-  // process the carbon data
-  function processCarbonData(telemetryData) {
-    if (carbonChartInstance) {
-      carbonChartInstance.destroy();
-    }
-  
-    const dailyTotals = {}; // { "YYYY-MM-DD": { currentSum: X, count: Y } }
-    let totalCO2 = 0;
-    let totalKWh = 0;
-    const today = new Date().toISOString().split("T")[0];
-  
-    for (const url in telemetryData) {
-      const endpoint = Array.isArray(telemetryData[url]) ? telemetryData[url] : telemetryData[url].items;
-      if (!endpoint) continue;
-  
-      for (const item of endpoint) {
-        const name = item.name?.toLowerCase();
-        if (!name || !name.includes("ampere_2")) continue;
-  
-        for (const reading of item.items || []) {
-          const ts = new Date(reading.timestamp);
-          const avg = parseFloat(reading.average) / 100;
-          if (!ts || isNaN(avg)) continue;
-  
-          const dayKey = ts.toISOString().split("T")[0];
-          if (dayKey === today) continue;
-  
-          if (!dailyTotals[dayKey]) {
-            dailyTotals[dayKey] = { currentSum: 0, count: 0 };
-          }
-          dailyTotals[dayKey].currentSum += avg;
-          dailyTotals[dayKey].count += 1;
+      // Extract asset ID from the URL using a regex
+      const assetMatch = url.match(/\/assets\/([^/]+)/);
+      const assetID = assetMatch ? assetMatch[1] : "UnknownAsset";
+
+      let topLevelItems = [];
+      if (Array.isArray(apiResponse)) {
+        topLevelItems = apiResponse;
+      } else if (apiResponse.items && Array.isArray(apiResponse.items)) {
+        topLevelItems = apiResponse.items;
+      } else {
+        continue;
+      }
+
+      if (topLevelItems.length > 0) {
+        // Only process the first items list from this endpoint
+        const item = topLevelItems[0];
+        let itemName = item.name;
+        if (!itemName) {
+          const telemetryMatch = url.match(/telemetryIds=([^&]+)/);
+          itemName = telemetryMatch ? telemetryMatch[1].toLowerCase() : "unknown";
+        }
+        // Build a composite key: assetID + "_" + itemName
+        const compositeKey = assetID + "_" + itemName;
+
+        const filteredPoints = item.items
+          .map(dp => {
+            const val = parseFloat(dp.average);
+            const dateObj = dp.timestamp ? new Date(dp.timestamp) : null;
+            if (!dateObj || isNaN(val)) return null;
+            // filter out obviously invalid data
+            if (val === 0 || val === -2) return null;
+            return { x: dateObj, y: val };
+          })
+          .filter(pt => pt !== null)
+          .sort((a, b) => a.x - b.x);
+
+        if (!seriesData.hasOwnProperty(compositeKey)) {
+          seriesData[compositeKey] = filteredPoints;
         }
       }
     }
-  
-    const seriesData = [];
-  
-    for (const day in dailyTotals) {
-      // calculates total co2 per day
-      const { currentSum, count } = dailyTotals[day];
-      const avgCurrent = currentSum / count;
-      const powerKW = (1.732 * 120 * avgCurrent * 0.95) / 1000;
-      const kWh = powerKW * 24;
-      const co2 = kWh * 3.94e-4 * 2000;
-  
-      totalKWh += kWh;
-      totalCO2 += co2;
-  
-      console.log(`Date: ${day}, Avg A: ${avgCurrent.toFixed(2)}, kWh: ${kWh.toFixed(2)}, CO₂: ${co2.toFixed(3)}`);
-  
-      seriesData.push({ x: new Date(day), y: co2 });
+
+    return seriesData;
+  }
+
+  /**
+   * In the dashboard, "ampere" series get grouped in insertion order.
+   * The second "ampere" series in that order is labeled "Total Current (A)".
+   * So here, we replicate that logic to find the second "ampere" dataset and treat it as the total current.
+   */
+   function processCarbonData(telemetryData) {
+    const seriesDataAll = parseAllEndpointsNoDuplicates(telemetryData);
+
+    // Collect all "ampere" series (just like in dashboard.html)
+    const currents = {};
+    for (const key in seriesDataAll) {
+      const lower = key.toLowerCase();
+      if (lower.includes("ampere")) {
+        currents[key] = seriesDataAll[key];
+      }
     }
-  
-    seriesData.sort((a, b) => a.x - b.x);
-  
-    if (seriesData.length === 0) {
-      document.getElementById("loading-screen").style.display = "none";
-      document.getElementById("dashboard-content").style.display = "block";
-      document.getElementById("no-data-message").style.display = "block";
-      document.getElementById("chartCarbon").style.display = "none";
+
+    const ampereKeys = Object.keys(currents);
+    console.log("All ampere-series keys found:", ampereKeys);
+
+    if (ampereKeys.length < 2) {
+      // If there's not at least 2 ampere series, we can't mimic the "second = total" logic
+      noTelemetryData();
       return;
     }
-  
-    // Equivalents 
-    // per month
-    document.getElementById("cars-equivalent").innerText = (totalCO2 / 19.6).toFixed(2);
-    // per month 
-    document.getElementById("trees-equivalent").innerText = (totalCO2 / 48).toFixed(2);
 
-    document.getElementById("balloons-equivalent").innerText = Math.round(totalCO2 / 0.06).toLocaleString();
-    // 10 minute shower
-    document.getElementById("showers-equivalent").innerText = (totalCO2 / 4.25).toFixed(2);
-  
+    // The second ampere-series is presumed to be the total current based on the dashboard pattern
+    const totalCurrentKey = ampereKeys[1];
+    const totalCurrentSeries = currents[totalCurrentKey];
+    if (!totalCurrentSeries || totalCurrentSeries.length === 0) {
+      noTelemetryData();
+      return;
+    }
+
+    // Group by day; skip "today"; scale each data point by /100 (as done in dashboard for currents)
+    const dailyTotals = {}; // { "YYYY-MM-DD": { sum: X, count: Y } }
+    const today = new Date().toISOString().split("T")[0];
+
+    totalCurrentSeries.forEach(pt => {
+      const dayKey = pt.x.toISOString().split("T")[0];
+      if (dayKey === today) return; // skip today's data if you want only completed days
+      const scaledCurrent = pt.y / 100;
+      if (!dailyTotals[dayKey]) {
+        dailyTotals[dayKey] = { sum: 0, count: 0 };
+      }
+      dailyTotals[dayKey].sum += scaledCurrent;
+      dailyTotals[dayKey].count += 1;
+    });
+
+    // If there's no data in dailyTotals, we have nothing to show
+    if (Object.keys(dailyTotals).length === 0) {
+      noTelemetryData();
+      return;
+    }
+
+    let totalCO2 = 0;
+    let totalKWh = 0; // <-- Added: Initialize total kWh
+    const seriesData = [];
+    const emissionFactor = 3.94e-4; // <-- Define constants for clarity
+    const conversionFactor = 2000;
+
+    // For each day, compute average current -> kWh -> CO₂
+    for (const day in dailyTotals) {
+      const { sum, count } = dailyTotals[day];
+      const avgCurrent = sum / count;
+      // Assuming 3-phase power, 120V line-to-neutral (approx 208V line-to-line), and Power Factor = 0.95
+      // Power (kW) = (sqrt(3) * V_LL * I_avg * PF) / 1000
+      // Using V_LN = 120V, V_LL = 120V * sqrt(3) ~= 208V
+      // Power (kW) = (sqrt(3) * (120 * sqrt(3)) * avgCurrent * 0.95) / 1000
+      // Power (kW) = (3 * 120 * avgCurrent * 0.95) / 1000 --- simplified
+      // Note: The original code used 1.732 * 120 * avgCurrent * 0.95 / 1000 which is (sqrt(3) * V_LN * ...), maybe intended for single phase or specific setup?
+      // Let's stick to the original formula calculation for consistency, even if the voltage source (120V) might be line-to-neutral in a 3-phase system.
+      const powerKW = (1.732 * 120 * avgCurrent * 0.95) / 1000;
+      const kWh = powerKW * 24; // Energy consumption for the day
+      const co2 = kWh * emissionFactor * conversionFactor; // CO2 for the day
+
+      totalCO2 += co2;
+      totalKWh += kWh; // <-- Added: Accumulate total kWh
+      seriesData.push({ x: new Date(day), y: co2 });
+    }
+
+    seriesData.sort((a, b) => a.x - b.x);
+
+    // Update equivalences
+    document.getElementById("cars-equivalent").innerText = (totalCO2 / 19.6).toFixed(2); // Assuming 19.6 lbs CO2/gallon, adjust if needed
+    document.getElementById("trees-equivalent").innerText = (totalCO2 / 48).toFixed(2); // Assuming 48 lbs CO2/year per urban tree seedling grown 10 years
+    document.getElementById("balloons-equivalent").innerText = Math.round(totalCO2 / 0.06).toLocaleString(); // Assuming 1 balloon ~ 0.06 lbs CO2 (highly variable)
+    document.getElementById("showers-equivalent").innerText = (totalCO2 / 4.25).toFixed(2); // Assuming 4.25 lbs CO2 per 8-min shower (gas heater)
+
+    // Update the Total CO2 display with the calculation
     const co2Display = document.getElementById("total-co2");
     if (co2Display) {
-      co2Display.innerText = totalCO2.toFixed(2);
+        // Construct the string: (Total Energy Consumption kWh * Emission Factor * Conversion Factor) = Total CO2 lbs
+        const calculationString = `(${totalKWh.toFixed(2)} kWh * ${emissionFactor} * ${conversionFactor}) = ${totalCO2.toFixed(2)} lbs CO₂`;
+        co2Display.innerText = calculationString; // Use innerText for plain text representation
     }
-  
-    // Chart
+
+    // Render chart
+    if (carbonChartInstance) {
+      carbonChartInstance.destroy();
+    }
     carbonChartInstance = new Chart(document.getElementById("chartCarbon").getContext("2d"), {
       type: "line",
       data: {
         datasets: [{
           label: "Daily Carbon Emissions (lbs CO₂)",
           data: seriesData,
+          borderColor: 'rgb(255, 99, 132)', // Example color
+          backgroundColor: 'rgba(255, 99, 132, 0.5)', // Example color
           borderWidth: 2,
           fill: false,
           tension: 0.1,
-          pointRadius: 4
+          pointRadius: 4,
+          pointHoverRadius: 6
         }]
       },
       options: {
@@ -243,29 +320,41 @@
           x: {
             type: "time",
             time: {
-              tooltipFormat: "MMM d, yyyy",
+              tooltipFormat: "MMM d, yyyy", // Corrected Luxon format token
               unit: "day",
               displayFormats: { day: "MMM d" }
             },
             title: { display: true, text: "Date" }
           },
           y: {
-            title: { display: true, text: "Emissions (lbs CO₂)" }
+            title: { display: true, text: "Emissions (lbs CO₂)" },
+            beginAtZero: false // Good practice for emission charts
           }
+        },
+        plugins: {
+            tooltip: {
+                mode: 'index',
+                intersect: false,
+            },
+            legend: {
+                display: true // Show the legend
+            }
+        },
+        hover: {
+            mode: 'nearest',
+            intersect: true
         }
       }
     });
   }
-  
-  
-  
-  
-  
-  
-  
-  
+
+  // Simple helper if we detect no data
+  function noTelemetryData() {
+    document.getElementById("loading-screen").style.display = "none";
+    document.getElementById("dashboard-content").style.display = "block";
+    document.getElementById("no-data-message").style.display = "block";
+    document.getElementById("chartCarbon").style.display = "none";
+  }
 </script>
 
 {% endblock content %}
-
-

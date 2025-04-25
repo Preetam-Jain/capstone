@@ -65,7 +65,7 @@ def scrape_and_get_telemetry():
     PASSWORD = "Capstone25!"
 
     chrome_options = Options()
-    chrome_options.add_argument("--headless")
+    # chrome_options.add_argument("--headless")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--no-sandbox")
@@ -137,8 +137,6 @@ def scrape_and_get_telemetry():
             except Exception as ex:
                 telemetry_data[url] = {"error": str(ex)}
         print("got here")
-        with open("telemetry_output.json", "w") as f:
-            json.dump(telemetry_data, f, indent=4)
 
         return {
             "telemetry_requests": telemetry_requests,
@@ -485,6 +483,14 @@ def init_scheduler(app):
         args=[app],
         max_instances=1
     )
+
+    # scheduler.add_job(
+    #     sendWeeklyUpdateAll,
+    #     trigger=CronTrigger(day_of_week='mon', hour=13, minute=0),
+    #     args=[app],
+    #     max_instances=1
+    # )
+
 
 ############################################################
 # 7) FLASK ROUTES
